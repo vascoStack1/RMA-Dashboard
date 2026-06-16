@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunmi Terminal Stock Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#003057;--cyan:#0EAAF1;--bg:#f5f7fa;--card:#fff;
+  --text:#1a2332;--muted:#5f6d7e;--border:#e2e6ec;
+  --red:#dc3545;--red-bg:#fef2f2;--red-text:#991b1b;
+  --orange:#f59e0b;--orange-bg:#fffbeb;--orange-text:#92400e;
+  --green:#10b981;--green-bg:#ecfdf5;--green-text:#065f46;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);padding:24px;max-width:960px;margin:0 auto}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.logo{background:var(--navy);color:#fff;font-weight:600;font-size:14px;padding:8px 14px;border-radius:8px;letter-spacing:0.5px}
+h1{font-size:22px;font-weight:600;color:var(--navy)}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:24px}
+.refresh-info{font-size:12px;color:var(--muted);margin-bottom:24px;display:flex;align-items:center;gap:6px}
+.refresh-info button{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--cyan);cursor:pointer;font-family:inherit}
+.refresh-info button:hover{background:var(--cyan);color:#fff}
+.setup-box{background:var(--card);border:2px dashed var(--cyan);border-radius:12px;padding:24px;margin-bottom:24px;display:none}
+.setup-box h2{font-size:16px;font-weight:600;margin-bottom:12px;color:var(--navy)}
+.setup-box p{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+.setup-box input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:12px}
+.setup-box button{background:var(--cyan);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+.setup-box button:hover{background:var(--navy)}
+.setup-box code{background:#eef2f7;padding:2px 6px;border-radius:4px;font-size:12px}
+.alert{border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500}
+.alert-critical{background:var(--red-bg);color:var(--red-text)}
+.alert-warning{background:var(--orange-bg);color:var(--orange-text)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:20px 0}
+.metric{background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border)}
+.metric-label{font-size:12px;color:var(--muted);margin-bottom:4px}
+.metric-value{font-size:24px;font-weight:600;color:var(--navy)}
+.metric-value.danger{color:var(--red)}
+.section-title{font-size:16px;font-weight:600;color:var(--navy);margin:24px 0 12px}
+.table-wrap{background:var(--card);border-radius:10px;border:1px solid var(--border);overflow-x:auto;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+th.r,td.r{text-align:right}
+td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;display:inline-block}
+.badge-critical{background:var(--red-bg);color:var(--red-text)}
+.badge-warning{background:var(--orange-bg);color:var(--orange-text)}
+.badge-ok{background:var(--green-bg);color:var(--green-text)}
+.chart-wrap{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:20px;margin-bottom:24px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px;font-size:12px;color:var(--muted)}
+.chart-legend span{display:flex;align-items:center;gap:4px}
+.legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block}
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.slider-row label{font-size:13px;color:var(--muted)}
+.slider-row input[type=range]{flex:1;max-width:260px;accent-color:var(--cyan)}
+.slider-row .val{font-size:14px;font-weight:600;color:var(--navy);min-width:30px}
+.loading{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px}
+.error-msg{background:var(--red-bg);color:var(--red-text);padding:16px;border-radius:10px;margin:20px 0;font-size:14px}
+.footer{font-size:11px;color:var(--muted);margin-top:24px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">MSP</div>
+  <h1>Sunmi terminal stock dashboard</h1>
+</div>
+<p class="subtitle">Live data uit Google Sheets — verkooptempo, voorraaddekking en reorder advies</p>
+
+<div class="setup-box" id="setup">
+  <h2>Google Sheet koppelen</h2>
+  <p>
+    1. Maak een Google Sheet met twee tabbladen: <code>Sales</code> en <code>Stock</code><br>
+    2. Ga naar Bestand → Delen → Publiceren op het web → Publiceren<br>
+    3. Kopieer de Sheet ID uit de URL (het stuk tussen <code>/d/</code> en <code>/edit</code>)<br>
+    4. Plak het hieronder
+  </p>
+  <input type="text" id="sheetInput" placeholder="Bijv: 1A17bHr7Gy7DDpmCSCnNZyCdkFEpKxn38kDGjX65nhug">
+  <button onclick="saveSheet()">Koppelen</button>
+</div>
+
+<div class="refresh-info" id="refreshInfo" style="display:none">
+  <span id="lastUpdate"></span>
+  <button onclick="loadData()">Vernieuwen</button>
+  <button onclick="resetSheet()">Ander sheet</button>
+</div>
+
+<div id="alerts"></div>
+<div class="metrics" id="metrics"></div>
+
+<div id="mainContent" style="display:none">
+  <div class="section-title">Voorraaddekking per model</div>
+  <div class="table-wrap"><table id="stockTable"></table></div>
+
+  <div class="section-title">Maandelijkse verkoop</div>
+  <div class="chart-wrap">
+    <div class="chart-legend" id="legend"></div>
+    <div style="position:relative;height:280px"><canvas id="salesChart"></canvas></div>
+  </div>
+
+  <div class="section-title">Reorder advies</div>
+  <div class="slider-row">
+    <label>Dekkingsdoel (weken):</label>
+    <input type="range" min="4" max="24" value="16" step="1" id="coverageSlider">
+    <span class="val" id="coverageVal">16</span>
+  </div>
+  <div class="table-wrap"><table id="reorderTable"></table></div>
+</div>
+
+<div class="loading" id="loadingMsg" style="display:none">Data ophalen uit Google Sheets...</div>
+<div id="errorMsg"></div>
+
+<div class="footer">
+  Gebaseerd op Status IPEK-datums (key injection) als proxy voor leveringsdatum. Maandcijfers kunnen bulk RKI-sessies bevatten.<br>
+  P2 Lite SE voorraad = FW + HD gecombineerd.
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const COLORS = {
+  'P3 Air':'#dc3545','P3H':'#3266ad','P3KH':'#7F77DD','P2 SmartPads':'#BA7517',
+  'P2 MINI':'#888','P2 Pro':'#888','P2 Lite SE':'#5f6d7e','P2 SE':'#5f6d7e','P3 Mix':'#10b981'
+};
+
+let chart = null;
+let models = [];
+
+function getSheetId() { return localStorage.getItem('sunmi_sheet_id'); }
+function saveSheet() {
+  const id = document.getElementById('sheetInput').value.trim();
+  if (!id) return;
+  localStorage.setItem('sunmi_sheet_id', id);
+  document.getElementById('setup').style.display = 'none';
+  loadData();
+}
+function resetSheet() {
+  localStorage.removeItem('sunmi_sheet_id');
+  location.reload();
+}
+
+function init() {
+  const id = getSheetId();
+  if (!id) {
+    document.getElementById('setup').style.display = 'block';
+  } else {
+    loadData();
+  }
+}
+
+function loadSheetViaJsonp(sheetId, tabName) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_cb_' + tabName.replace(/\s/g,'') + '_' + Date.now();
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      reject(new Error('Timeout bij laden van tabblad "' + tabName + '". Check of het sheet is gepubliceerd en de tabbladen "Sales" en "Stock" heten.'));
+    }, 10000);
+
+    window[cbName] = function(response) {
+      clearTimeout(timeout);
+      delete window[cbName];
+      const script = document.getElementById('script_' + cbName);
+      if (script) script.remove();
+
+      if (response.status === 'error') {
+        reject(new Error(response.errors.map(e => e.message).join(', ')));
+        return;
+      }
+
+      const table = response.table;
+      const headers = table.cols.map(c => c.label || c.id);
+      const rows = table.rows.map(r => {
+        const obj = {};
+        r.c.forEach((cell, i) => {
+          obj[headers[i]] = cell ? (cell.v !== null ? cell.v : '') : '';
+        });
+        return obj;
+      });
+      resolve({ headers, rows });
+    };
+
+    const url = 'https://docs.google.com/spreadsheets/d/' + sheetId +
+      '/gviz/tq?tqx=responseHandler:' + cbName + '&sheet=' + encodeURIComponent(tabName);
+    const script = document.createElement('script');
+    script.id = 'script_' + cbName;
+    script.src = url;
+    script.onerror = function() {
+      clearTimeout(timeout);
+      delete window[cbName];
+      reject(new Error('Kan tabblad "' + tabName + '" niet laden. Check de Sheet ID.'));
+    };
+    document.body.appendChild(script);
+  });
+}
+
+async function loadData() {
+  const sheetId = getSheetId();
+  if (!sheetId) return;
+
+  document.getElementById('loadingMsg').style.display = 'block';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('errorMsg').innerHTML = '';
+  document.getElementById('alerts').innerHTML = '';
+  document.getElementById('metrics').innerHTML = '';
+
+  try {
+    const [salesData, stockData] = await Promise.all([
+      loadSheetViaJsonp(sheetId, 'Sales'),
+      loadSheetViaJsonp(sheetId, 'Stock')
+    ]);
+
+    const stockMap = {};
+    stockData.rows.forEach(r => {
+      const name = (r.Model || '').toString().trim();
+      const val = parseInt(r.Stock) || 0;
+      if (name) stockMap[name] = val;
+    });
+
+    const monthCols = salesData.headers.filter(h => h !== 'Model' && h !== '');
+
+    models = salesData.rows.map(r => {
+      const name = (r.Model || '').toString().trim();
+      if (!name) return null;
+      const sales = monthCols.map(m => parseInt(r[m]) || 0);
+      const last3 = sales.slice(-3);
+      const avg3 = Math.round(last3.reduce((a, b) => a + b, 0) / 3 * 10) / 10;
+      const weekRate = Math.round(avg3 / 4.33 * 10) / 10;
+      const stock = stockMap[name] ?? 0;
+      const weeks = weekRate > 0 ? Math.round(stock / weekRate * 10) / 10 : null;
+      return { name, sales, monthCols, avg3, weekRate, stock, weeks, color: COLORS[name] || '#888' };
+    }).filter(Boolean);
+
+    render();
+
+    document.getElementById('refreshInfo').style.display = 'flex';
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent =
+      'Laatst bijgewerkt: ' + now.toLocaleString('nl-NL', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+
+  } catch (err) {
+    document.getElementById('errorMsg').innerHTML =
+      '<div class="error-msg">Fout bij laden: ' + err.message + '<br><br>Check of:<br>• Het sheet is gepubliceerd (Bestand → Delen → Publiceren op het web)<br>• De tabbladen "Sales" en "Stock" heten (hoofdlettergevoelig)<br>• De Sheet ID klopt<br><br><button onclick="resetSheet()" style="background:#0EAAF1;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer;font-family:inherit">Opnieuw koppelen</button></div>';
+  }
+  document.getElementById('loadingMsg').style.display = 'none';
+}
+
+function render() {
+  document.getElementById('mainContent').style.display = 'block';
+
+  const totalSold = models.reduce((s, m) => s + m.sales.reduce((a, b) => a + b, 0), 0);
+  const totalStock = models.reduce((s, m) => s + m.stock, 0);
+  const avgMonth = Math.round(totalSold / (models[0]?.monthCols.length || 5));
+  const alertCount = models.filter(m => m.weeks !== null && m.weeks <= 16).length;
+
+  document.getElementById('metrics').innerHTML =
+    '<div class="metric"><div class="metric-label">Totaal verkocht</div><div class="metric-value">' + totalSold.toLocaleString('nl-NL') + '</div></div>' +
+    '<div class="metric"><div class="metric-label">Gem. per maand</div><div class="metric-value">' + avgMonth.toLocaleString('nl-NL') + '</div></div>' +
+    '<div class="metric"><div class="metric-label">Totale voorraad</div><div class="metric-value">' + totalStock.toLocaleString('nl-NL') + '</div></div>' +
+    '<div class="metric"><div class="metric-label">Modellen met alert</div><div class="metric-value ' + (alertCount > 0 ? 'danger' : '') + '">' + alertCount + '</div></div>';
+
+  var alertHTML = '';
+  models.forEach(function(m) {
+    if (m.weeks !== null && m.weeks < 4)
+      alertHTML += '<div class="alert alert-critical"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' + m.name + ': nog ' + m.weeks + ' weken voorraad — direct bestellen!</div>';
+    else if (m.weeks !== null && m.weeks <= 16)
+      alertHTML += '<div class="alert alert-warning"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + m.name + ': ' + m.weeks + ' weken voorraad — binnenkort bestellen</div>';
+  });
+  document.getElementById('alerts').innerHTML = alertHTML;
+
+  var th = '<tr><th>Model</th><th class="r">Gem/mnd (3M)</th><th class="r">Per week</th><th class="r">Voorraad</th><th class="r">Dekking</th><th class="r">Forecast 3 mnd</th></tr>';
+  var tb = '';
+  models.forEach(function(m) {
+    var badge = '';
+    if (m.weeks !== null && m.weeks < 4) badge = '<span class="badge badge-critical">kritiek</span>';
+    else if (m.weeks !== null && m.weeks <= 16) badge = '<span class="badge badge-warning">let op</span>';
+    else badge = '<span class="badge badge-ok">ok</span>';
+    var wkStr = m.weeks !== null ? m.weeks + ' wkn' : 'n/a';
+    var fc = Math.round(m.avg3 * 3);
+    tb += '<tr><td style="font-weight:500">' + m.name + '</td><td class="r">' + m.avg3 + '</td><td class="r">' + m.weekRate + '</td><td class="r">' + m.stock.toLocaleString('nl-NL') + '</td><td class="r">' + badge + ' ' + wkStr + '</td><td class="r">' + fc.toLocaleString('nl-NL') + '</td></tr>';
+  });
+  document.getElementById('stockTable').innerHTML = th + tb;
+
+  var show = models.filter(function(m) { return m.avg3 > 0; });
+  document.getElementById('legend').innerHTML = show.map(function(m) {
+    return '<span><span class="legend-dot" style="background:' + m.color + '"></span>' + m.name + '</span>';
+  }).join('');
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('salesChart'), {
+    type: 'line',
+    data: {
+      labels: models[0] ? models[0].monthCols : [],
+      datasets: show.map(function(m) {
+        return {
+          label: m.name, data: m.sales, borderColor: m.color,
+          backgroundColor: m.color + '22', borderWidth: 2, pointRadius: 4, tension: 0.3, fill: false
+        };
+      })
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#5f6d7e' } },
+        x: { grid: { display: false }, ticks: { color: '#5f6d7e', autoSkip: false } }
+      }
+    }
+  });
+
+  renderReorder(parseInt(document.getElementById('coverageSlider').value));
+}
+
+function renderReorder(target) {
+  var h = '<tr><th>Model</th><th class="r">Nodig voor ' + target + ' wkn</th><th class="r">Op voorraad</th><th class="r">Bestellen</th></tr>';
+  var any = false;
+  models.forEach(function(m) {
+    if (m.weekRate <= 0) return;
+    var needed = Math.round(target * m.weekRate);
+    var order = Math.max(0, needed - m.stock);
+    if (order === 0) return;
+    any = true;
+    h += '<tr><td style="font-weight:500">' + m.name + '</td><td class="r">' + needed.toLocaleString('nl-NL') + '</td><td class="r">' + m.stock.toLocaleString('nl-NL') + '</td><td class="r" style="font-weight:600;color:var(--red)">' + order.toLocaleString('nl-NL') + '</td></tr>';
+  });
+  if (!any) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">Alle modellen zitten boven het dekkingsdoel</td></tr>';
+  document.getElementById('reorderTable').innerHTML = h;
+}
+
+document.getElementById('coverageSlider').addEventListener('input', function() {
+  document.getElementById('coverageVal').textContent = this.value;
+  renderReorder(parseInt(this.value));
+});
+
+init();
+</script>
+</body>
+</html>
