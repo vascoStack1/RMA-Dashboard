@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sunmi Terminal Stock Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --navy:#003057;--cyan:#0EAAF1;--bg:#f5f7fa;--card:#fff;
+  --text:#1a2332;--muted:#5f6d7e;--border:#e2e6ec;
+  --red:#dc3545;--red-bg:#fef2f2;--red-text:#991b1b;
+  --orange:#f59e0b;--orange-bg:#fffbeb;--orange-text:#92400e;
+  --green:#10b981;--green-bg:#ecfdf5;--green-text:#065f46;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);padding:24px;max-width:960px;margin:0 auto}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.logo{background:var(--navy);color:#fff;font-weight:600;font-size:14px;padding:8px 14px;border-radius:8px;letter-spacing:0.5px}
+h1{font-size:22px;font-weight:600;color:var(--navy)}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:24px}
+
+.upload-zone{background:var(--card);border:2px dashed var(--cyan);border-radius:12px;padding:32px;text-align:center;margin-bottom:24px;cursor:pointer;transition:all 0.2s}
+.upload-zone:hover,.upload-zone.dragover{background:#f0f9ff;border-color:var(--navy)}
+.upload-zone svg{margin-bottom:8px}
+.upload-zone p{font-size:14px;color:var(--muted);margin-bottom:4px}
+.upload-zone .main-text{font-size:15px;font-weight:500;color:var(--navy)}
+.upload-zone input{display:none}
+
+.toolbar{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
+.toolbar button{background:none;border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-size:12px;color:var(--cyan);cursor:pointer;font-family:inherit}
+.toolbar button:hover{background:var(--cyan);color:#fff}
+.toolbar .file-info{font-size:12px;color:var(--muted)}
+
+.alert{border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500}
+.alert-critical{background:var(--red-bg);color:var(--red-text)}
+.alert-warning{background:var(--orange-bg);color:var(--orange-text)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:20px 0}
+.metric{background:var(--card);border-radius:10px;padding:16px;border:1px solid var(--border)}
+.metric-label{font-size:12px;color:var(--muted);margin-bottom:4px}
+.metric-value{font-size:24px;font-weight:600;color:var(--navy)}
+.metric-value.danger{color:var(--red)}
+.section-title{font-size:16px;font-weight:600;color:var(--navy);margin:24px 0 12px}
+.table-wrap{background:var(--card);border-radius:10px;border:1px solid var(--border);overflow-x:auto;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+th.r,td.r{text-align:right}
+td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;display:inline-block}
+.badge-critical{background:var(--red-bg);color:var(--red-text)}
+.badge-warning{background:var(--orange-bg);color:var(--orange-text)}
+.badge-ok{background:var(--green-bg);color:var(--green-text)}
+.chart-wrap{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:20px;margin-bottom:24px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px;font-size:12px;color:var(--muted)}
+.chart-legend span{display:flex;align-items:center;gap:4px}
+.legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block}
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.slider-row label{font-size:13px;color:var(--muted)}
+.slider-row input[type=range]{flex:1;max-width:260px;accent-color:var(--cyan)}
+.slider-row .val{font-size:14px;font-weight:600;color:var(--navy);min-width:30px}
+.footer{font-size:11px;color:var(--muted);margin-top:24px;line-height:1.6}
+#dashboard{display:none}
+.error-msg{background:var(--red-bg);color:var(--red-text);padding:16px;border-radius:10px;margin:20px 0;font-size:14px}
+.processing{text-align:center;padding:20px;color:var(--muted);font-size:14px;display:none}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">MSP</div>
+  <h1>Sunmi terminal stock dashboard</h1>
+</div>
+<p class="subtitle">Upload het Sunmi SN Excel bestand en het dashboard genereert zichzelf</p>
+
+<div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0EAAF1" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+  <p class="main-text">Sleep het Sunmi SN bestand hierin of klik om te selecteren</p>
+  <p>.xlsx bestand — data blijft lokaal in je browser</p>
+  <input type="file" id="fileInput" accept=".xlsx,.xls">
+</div>
+
+<div class="processing" id="processing">Bestand verwerken...</div>
+<div id="errorMsg"></div>
+
+<div id="dashboard">
+  <div class="toolbar">
+    <button onclick="document.getElementById('fileInput').click()">Ander bestand uploaden</button>
+    <span class="file-info" id="fileInfo"></span>
+  </div>
+
+  <div id="alerts"></div>
+  <div class="metrics" id="metrics"></div>
+
+  <div class="section-title">Voorraaddekking per model</div>
+  <div class="table-wrap"><table id="stockTable"></table></div>
+
+  <div class="section-title">Maandelijkse verkoop</div>
+  <div class="chart-wrap">
+    <div class="chart-legend" id="legend"></div>
+    <div style="position:relative;height:280px"><canvas id="salesChart"></canvas></div>
+  </div>
+
+  <div class="section-title">Reorder advies</div>
+  <div class="slider-row">
+    <label>Dekkingsdoel (weken):</label>
+    <input type="range" min="4" max="24" value="16" step="1" id="coverageSlider">
+    <span class="val" id="coverageVal">16</span>
+  </div>
+  <div class="table-wrap"><table id="reorderTable"></table></div>
+</div>
+
+<div class="footer">
+  Gebaseerd op Status IPEK-datums (key injection) als proxy voor leveringsdatum. Maandcijfers kunnen bulk RKI-sessies bevatten.<br>
+  P2 Lite SE voorraad = FW + HD gecombineerd. Data wordt niet opgeslagen — alleen verwerkt in je browser.
+</div>
+
+<script>
+var COLORS = {
+  'P3 Air':'#dc3545','P3H':'#3266ad','P3KH':'#7F77DD','P2 SmartPads':'#BA7517',
+  'P2 MINI':'#888','P2 Pro':'#888','P2 Lite SE':'#5f6d7e','P2 SE':'#5f6d7e','P3 Mix':'#10b981'
+};
+var MODEL_SHEETS = ['P3 Air','P3H','P3KH','P3 Mix','P2 SmartPads','P2 MINI','P2 Pro','P2 Lite SE','P2 SE'];
+var MONTH_NAMES = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+var chart = null;
+var DATA = null;
+
+// Drag and drop
+var dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
+});
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  if (e.target.files.length) processFile(e.target.files[0]);
+});
+
+function processFile(file) {
+  document.getElementById('processing').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('errorMsg').innerHTML = '';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var result = parseWorkbook(wb);
+      DATA = result;
+      document.getElementById('fileInfo').textContent = file.name + ' — geladen op ' +
+        new Date().toLocaleString('nl-NL', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      document.getElementById('dropZone').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      render();
+    } catch(err) {
+      document.getElementById('errorMsg').innerHTML =
+        '<div class="error-msg">Fout bij verwerken: ' + err.message + '<br><br>Zorg dat het bestand de juiste Sunmi SN spreadsheet is met tabbladen per model en een Summary sheet.</div>';
+    }
+    document.getElementById('processing').style.display = 'none';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseWorkbook(wb) {
+  var dateRe = /(\d{1,2})-(\d{1,2})-(\d{4})/;
+  var monthlyCounts = {}; // model -> {YYYY-MM: count}
+  var allMonthKeys = {};
+
+  MODEL_SHEETS.forEach(function(sheetName) {
+    monthlyCounts[sheetName] = {};
+    var ws = wb.Sheets[sheetName];
+    if (!ws) return;
+
+    var rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    for (var i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || !row[1]) continue; // no SN
+      var batch = (row[0] || '').toString().toLowerCase();
+      if (batch.indexOf('demo') >= 0) continue;
+
+      var ipek = (row[2] || '').toString();
+      var m = ipek.match(dateRe);
+      if (!m) continue;
+
+      var day = parseInt(m[1]), month = parseInt(m[2]), year = parseInt(m[3]);
+      if (month < 1 || month > 12 || year < 2020 || year > 2030) continue;
+
+      var key = year + '-' + (month < 10 ? '0' : '') + month;
+      monthlyCounts[sheetName][key] = (monthlyCounts[sheetName][key] || 0) + 1;
+      allMonthKeys[key] = true;
+    }
+  });
+
+  // Find last 5 complete months
+  var sortedKeys = Object.keys(allMonthKeys).sort();
+  // Remove current month (might be incomplete)
+  var now = new Date();
+  var currentKey = now.getFullYear() + '-' + (now.getMonth() + 1 < 10 ? '0' : '') + (now.getMonth() + 1);
+  // Also remove future months
+  sortedKeys = sortedKeys.filter(function(k) { return k <= currentKey; });
+  // Take last 5 that have any data
+  var last5 = sortedKeys.slice(-5);
+
+  var monthLabels = last5.map(function(k) {
+    var parts = k.split('-');
+    return MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0].slice(2);
+  });
+
+  // Stock from Summary
+  var stockMap = {};
+  var summaryWs = wb.Sheets['Summary'];
+  if (summaryWs) {
+    var summaryRows = XLSX.utils.sheet_to_json(summaryWs, { header: 1 });
+    for (var i = 1; i < summaryRows.length; i++) {
+      var sr = summaryRows[i];
+      if (!sr || !sr[1]) continue;
+      var modelName = sr[1].toString().trim();
+      var inStock = parseInt(sr[4]) || 0;
+      stockMap[modelName.toUpperCase()] = inStock;
+    }
+  }
+
+  // Map stock names to model sheet names
+  var stockNameMap = {
+    'P3 AIR':'P3 Air','P3H':'P3H','P3KH':'P3KH','P2 SMARTPAD':'P2 SmartPads','P2 SMARTPADS':'P2 SmartPads',
+    'P2 MINI':'P2 MINI','P2 PRO':'P2 Pro',
+    'P2 LITE SE FW':'P2 Lite SE_FW','P2 LITE SE HD':'P2 Lite SE_HD',
+    'P2 SE':'P2 SE','P3 MIX':'P3 Mix'
+  };
+
+  var modelStock = {};
+  Object.keys(stockMap).forEach(function(k) {
+    if (k.indexOf('LITE SE FW') >= 0) { modelStock['P2 Lite SE'] = (modelStock['P2 Lite SE'] || 0) + stockMap[k]; }
+    else if (k.indexOf('LITE SE HD') >= 0) { modelStock['P2 Lite SE'] = (modelStock['P2 Lite SE'] || 0) + stockMap[k]; }
+    else if (k.indexOf('LITE SE') >= 0 && k.indexOf('FW') < 0 && k.indexOf('HD') < 0) { modelStock['P2 Lite SE'] = (modelStock['P2 Lite SE'] || 0) + stockMap[k]; }
+    else if (k.indexOf('SMARTPAD') >= 0) { modelStock['P2 SmartPads'] = stockMap[k]; }
+    else if (k === 'P3 AIR') { modelStock['P3 Air'] = stockMap[k]; }
+    else if (k === 'P3H') { modelStock['P3H'] = stockMap[k]; }
+    else if (k === 'P3KH') { modelStock['P3KH'] = stockMap[k]; }
+    else if (k === 'P2 MINI' || k === 'P2 Mini') { modelStock['P2 MINI'] = stockMap[k]; }
+    else if (k === 'P2 PRO') { modelStock['P2 Pro'] = stockMap[k]; }
+    else if (k === 'P2 SE') { modelStock['P2 SE'] = stockMap[k]; }
+    else if (k === 'P3 MIX') { modelStock['P3 Mix'] = stockMap[k]; }
+  });
+
+  var models = MODEL_SHEETS.map(function(name) {
+    var sales = last5.map(function(k) { return monthlyCounts[name][k] || 0; });
+    return { name: name, sales: sales, stock: modelStock[name] || 0 };
+  });
+
+  return { months: monthLabels, models: models };
+}
+
+function compute() {
+  return DATA.models.map(function(m) {
+    var last3 = m.sales.slice(-3);
+    var avg3 = Math.round(last3.reduce(function(a,b){return a+b},0) / 3 * 10) / 10;
+    var weekRate = Math.round(avg3 / 4.33 * 10) / 10;
+    var weeks = weekRate > 0 ? Math.round(m.stock / weekRate * 10) / 10 : null;
+    return { name:m.name, sales:m.sales, stock:m.stock, avg3:avg3, weekRate:weekRate, weeks:weeks, color:COLORS[m.name]||'#888' };
+  });
+}
+
+function render() {
+  var models = compute();
+  var totalSold = models.reduce(function(s,m){return s+m.sales.reduce(function(a,b){return a+b},0)},0);
+  var totalStock = models.reduce(function(s,m){return s+m.stock},0);
+  var avgMonth = Math.round(totalSold / DATA.months.length);
+  var alertCount = models.filter(function(m){return m.weeks!==null&&m.weeks<=16}).length;
+
+  document.getElementById('metrics').innerHTML =
+    '<div class="metric"><div class="metric-label">Totaal verkocht ('+DATA.months.length+' mnd)</div><div class="metric-value">'+totalSold.toLocaleString('nl-NL')+'</div></div>'+
+    '<div class="metric"><div class="metric-label">Gem. per maand</div><div class="metric-value">'+avgMonth.toLocaleString('nl-NL')+'</div></div>'+
+    '<div class="metric"><div class="metric-label">Totale voorraad</div><div class="metric-value">'+totalStock.toLocaleString('nl-NL')+'</div></div>'+
+    '<div class="metric"><div class="metric-label">Modellen met alert</div><div class="metric-value '+(alertCount>0?'danger':'')+'">'+alertCount+'</div></div>';
+
+  var alertHTML = '';
+  models.forEach(function(m) {
+    if (m.weeks !== null && m.weeks < 4)
+      alertHTML += '<div class="alert alert-critical"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'+m.name+': nog '+m.weeks+' weken voorraad — direct bestellen!</div>';
+    else if (m.weeks !== null && m.weeks <= 16)
+      alertHTML += '<div class="alert alert-warning"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'+m.name+': '+m.weeks+' weken voorraad — binnenkort bestellen</div>';
+  });
+  document.getElementById('alerts').innerHTML = alertHTML;
+
+  var th = '<tr><th>Model</th><th class="r">Gem/mnd (3M)</th><th class="r">Per week</th><th class="r">Voorraad</th><th class="r">Dekking</th><th class="r">Forecast 3 mnd</th></tr>';
+  var tb = '';
+  models.forEach(function(m) {
+    var badge = '';
+    if (m.weeks !== null && m.weeks < 4) badge = '<span class="badge badge-critical">kritiek</span>';
+    else if (m.weeks !== null && m.weeks <= 16) badge = '<span class="badge badge-warning">let op</span>';
+    else badge = '<span class="badge badge-ok">ok</span>';
+    var wkStr = m.weeks !== null ? m.weeks + ' wkn' : 'n/a';
+    var fc = Math.round(m.avg3 * 3);
+    tb += '<tr><td style="font-weight:500">'+m.name+'</td><td class="r">'+m.avg3+'</td><td class="r">'+m.weekRate+'</td><td class="r">'+m.stock.toLocaleString('nl-NL')+'</td><td class="r">'+badge+' '+wkStr+'</td><td class="r">'+fc.toLocaleString('nl-NL')+'</td></tr>';
+  });
+  document.getElementById('stockTable').innerHTML = th + tb;
+
+  var show = models.filter(function(m){return m.avg3>0});
+  document.getElementById('legend').innerHTML = show.map(function(m){
+    return '<span><span class="legend-dot" style="background:'+m.color+'"></span>'+m.name+'</span>';
+  }).join('');
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('salesChart'), {
+    type:'line',
+    data:{
+      labels:DATA.months,
+      datasets:show.map(function(m){return{
+        label:m.name, data:m.sales, borderColor:m.color,
+        backgroundColor:m.color+'22', borderWidth:2, pointRadius:4, tension:0.3, fill:false
+      }})
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'},ticks:{color:'#5f6d7e'}},
+        x:{grid:{display:false},ticks:{color:'#5f6d7e',autoSkip:false}}
+      }
+    }
+  });
+
+  renderReorder(parseInt(document.getElementById('coverageSlider').value));
+}
+
+function renderReorder(target) {
+  var models = compute();
+  var h = '<tr><th>Model</th><th class="r">Nodig voor '+target+' wkn</th><th class="r">Op voorraad</th><th class="r">Bestellen</th></tr>';
+  var any = false;
+  models.forEach(function(m) {
+    if (m.weekRate <= 0) return;
+    var needed = Math.round(target * m.weekRate);
+    var order = Math.max(0, needed - m.stock);
+    if (order === 0) return;
+    any = true;
+    h += '<tr><td style="font-weight:500">'+m.name+'</td><td class="r">'+needed.toLocaleString('nl-NL')+'</td><td class="r">'+m.stock.toLocaleString('nl-NL')+'</td><td class="r" style="font-weight:600;color:var(--red)">'+order.toLocaleString('nl-NL')+'</td></tr>';
+  });
+  if (!any) h += '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px">Alle modellen zitten boven het dekkingsdoel</td></tr>';
+  document.getElementById('reorderTable').innerHTML = h;
+}
+
+document.getElementById('coverageSlider').addEventListener('input', function() {
+  document.getElementById('coverageVal').textContent = this.value;
+  renderReorder(parseInt(this.value));
+});
+</script>
+</body>
+</html>
